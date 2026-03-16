@@ -2,6 +2,7 @@ import pandas as pd
 import os
 from datetime import datetime
 from sqlalchemy import create_engine
+import logging
 
 db_config = {
     'host': '10.130.25.152',
@@ -26,12 +27,23 @@ tables = [
     "Sensors"
 ]
 
-print("Starting MySQL Extraction...")
+log_dir = r"C:\Logs"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "mysql_ingestion.log")
+
+logging.basicConfig(
+    filename=log_file,
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logging.info("Starting MySQL Extraction...")
 
 try:
-    print("Connecting to MySQL Database...")
+    logging.info("Connecting to MySQL Database...")
     conn = f"mysql+mysqlconnector://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}"
-    print("Connection successful!")
+    logging.info("Connection successful!")
     ssl_args = {
         'ssl_ca': db_config['ssl_ca'],
         'ssl_cert': db_config['ssl_cert'],
@@ -39,7 +51,7 @@ try:
     }
     
     engine = create_engine(conn, connect_args=ssl_args)
-    print("Connection successful!")
+    logging.info("Connection successful!")
 
     now = datetime.now()
     year, month, day = now.strftime("%Y"), now.strftime("%m"), now.strftime("%d")
@@ -61,14 +73,14 @@ try:
         file_path = os.path.join(final_dest_path, file_name)
         
         df.to_csv(file_path, index=False, encoding='utf-8')
-        print(f"Saved successfully: {file_name} ({len(df)} rows)")
+        logging.info(f"Saved successfully: {file_name} ({len(df)} rows)")
         
         extracted_count += 1
 
     engine.dispose()
 
-    print("Status: Success")
-    print(f"Tables successfully extracted: {extracted_count} out of {len(tables)}")
+    logging.info("Status: Success")
+    logging.info(f"Tables successfully extracted: {extracted_count} out of {len(tables)}")
 
 except Exception as e:
-    print(f"An error occurred: {e}")
+    logging.error(f"An error occurred: {e}")
