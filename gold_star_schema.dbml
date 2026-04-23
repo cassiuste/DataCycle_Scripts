@@ -1,0 +1,143 @@
+// =============================================================================
+// GOLD LAYER – STAR SCHEMA
+// Paste this into https://dbdiagram.io
+// =============================================================================
+
+Table gold.dim_date {
+  date_key        int         [pk, note: "YYYYMMDD"]
+  hour            int         [pk]
+  minute          int         [pk]
+  full_date       date
+  year            int
+  quarter         int
+  month           int
+  month_name      varchar
+  week_of_year    int
+  day_of_month    int
+  day_of_week     int
+  day_name        varchar
+  is_weekend      boolean
+  time_of_day     varchar     [note: "Night / Morning / Afternoon / Evening"]
+  datetime_slot   timestamp
+}
+
+Table gold.dim_building {
+  building_key    int         [pk]
+  house_name      varchar
+  first_name      varchar
+  last_name       varchar
+  city            varchar
+  npa             int
+  latitude        float
+  longitude       float
+  building_year   int
+  nb_people       int
+}
+
+Table gold.dim_room {
+  room_key        int         [pk, increment]
+  building_key    int         [ref: > gold.dim_building.building_key]
+  room_name       varchar
+  room_type       varchar     [note: "Living / Office / Bathroom / Laundry / Bedroom / Outdoor"]
+}
+
+Table gold.dim_equipment {
+  equipment_key   int         [pk, increment]
+  building_key    int         [ref: > gold.dim_building.building_key]
+  room_key        int         [ref: > gold.dim_room.room_key]
+  equipment_name  varchar
+  equipment_type  varchar     [default: "Smart Plug"]
+}
+
+Table gold.dim_energy_tariff {
+  tariff_key      int         [pk, increment]
+  tariff_name     varchar
+  hour_from       int
+  hour_to         int
+  chf_per_kwh     float
+}
+
+Table gold.fact_energy_consumption {
+  energy_key          bigint      [pk, increment]
+  date_key            int         [ref: > gold.dim_date.date_key]
+  hour                int
+  minute              int
+  building_key        int         [ref: > gold.dim_building.building_key]
+  room_key            int         [ref: > gold.dim_room.room_key]
+  equipment_key       int         [ref: > gold.dim_equipment.equipment_key]
+  tariff_key          int         [ref: > gold.dim_energy_tariff.tariff_key]
+  event_id            bigint
+  power_w             float
+  power_kwh           float
+  total_energy_wh     bigint
+  plug_temperature_c  float
+  switch_on           boolean
+  house_total_power_w float
+  house_power1_w      float
+  house_power2_w      float
+  house_power3_w      float
+  cost_chf            float       [note: "Generated: power_w / 1000 * tariff"]
+  ingested_at         timestamp
+}
+
+Table gold.fact_environment {
+  environment_key         bigint  [pk, increment]
+  date_key                int     [ref: > gold.dim_date.date_key]
+  hour                    int
+  minute                  int
+  building_key            int     [ref: > gold.dim_building.building_key]
+  room_key                int     [ref: > gold.dim_room.room_key]
+  event_id                bigint
+  temperature_c           float
+  humidity_pct            float
+  co2_ppm                 int
+  noise_db                int
+  pressure_hpa            float
+  absolute_pressure_hpa   float
+  outdoor_temperature_c   float
+  outdoor_humidity_pct    float
+  solar_irradiance_wm2    float
+  ingested_at             timestamp
+}
+
+Table gold.fact_doors_windows {
+  dw_key          bigint      [pk, increment]
+  date_key        int         [ref: > gold.dim_date.date_key]
+  hour            int
+  minute          int
+  building_key    int         [ref: > gold.dim_building.building_key]
+  room_key        int         [ref: > gold.dim_room.room_key]
+  event_id        bigint
+  sensor_type     varchar     [note: "Door / Window"]
+  sensor_index    int
+  is_open         boolean
+  battery_pct     int
+  ingested_at     timestamp
+}
+
+Table gold.fact_room_presence {
+  presence_key    bigint      [pk, increment]
+  date_key        int         [ref: > gold.dim_date.date_key]
+  hour            int
+  minute          int
+  building_key    int         [ref: > gold.dim_building.building_key]
+  room_key        int         [ref: > gold.dim_room.room_key]
+  event_id        bigint
+  motion_detected boolean
+  light_lux       int
+  temperature_c   float
+  presence_flag   int         [note: "Generated: 1 if motion else 0"]
+  ingested_at     timestamp
+}
+
+Table gold.fact_solar_prediction {
+  solar_key           bigint  [pk, increment]
+  date_key            int     [ref: > gold.dim_date.date_key]
+  hour                int
+  minute              int
+  value_wm2           float
+  is_missing          boolean
+  prediction_horizon  varchar
+  site                varchar
+  ingested_at         timestamp
+}

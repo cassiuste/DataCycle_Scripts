@@ -1,0 +1,4 @@
+idBuilding,idUser,idBuildingType,houseName,firstName,lastName,latitude,longitude,address,npa,city,buildingYear,phoneNumber,nbPeople,isHeatingOn
+1,1,2,JeremieVianin,Jeremie,Vianin,46.150258,7.170644,Chemin des Maraichers 25,1907,Saxon,2021,0795009880,1,0
+2,2,2,JimmyLoup,Jimmy,Loup,46.297450868166216,7.53219499745635,Sentier des Vignes 5,3960,Sierre,1976,0794677072,1,0
+ 
