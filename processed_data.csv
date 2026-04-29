@@ -1,0 +1,33 @@
+import pandas as pd
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+
+# connection details for the database
+token = "YOUR_TOKEN_HERE"
+org = "YourOrg"
+bucket = "ApartmentsData"
+url = "http://10.130.25.152:8086"
+
+def send_to_database():
+    print("starting to upload data...")
+    client = InfluxDBClient(url=url, token=token, org=org)
+    write_api = client.write_api(write_options=SYNCHRONOUS)
+
+    # load the csv 
+    df = pd.read_csv(r"C:\RawData\processed_data.csv")
+    
+    for index, row in df.iterrows():
+        # create point for the database
+        
+        point = Point("sensor_reading") \
+            .tag("room", row['name_r']) \
+            .tag("type", row['sensor_type']) \
+            .field("value", float(row['value'])) \
+            .time(row['timestamp'])
+        
+        write_api.write(bucket=bucket, record=point)
+    
+    print("all data is now in InfluxDB!")
+
+if __name__ == "__main__":
+    send_to_database()
