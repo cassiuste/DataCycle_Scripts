@@ -19,7 +19,7 @@ def find_file(pattern):
 def process_data():
     print("Starting the data process...")
     
-    # finding files (like the Reader nodes in Knime)
+    # finding files 
     sns_file = find_file("sensors_*.csv")
     rms_file = find_file("rooms_*.csv")
     json_file = find_file("*.json")
@@ -39,14 +39,14 @@ def process_data():
             data = json.load(f)
         df_read = pd.DataFrame(data)
 
-        # This part replaces the JOINER node
+        # replaces the JOINER node
         # join sensors with the rooms names
         df_mid = pd.merge(df_sns, df_rms, left_on='room_id', right_on='id', suffixes=('_s', '_r'))
         
         # join the result with the sensor values
         df_final = pd.merge(df_read, df_mid, left_on='sensor_id', right_on='id_s')
 
-        # This replaces the COLUMN FILTER node
+        # replace the COLUMN FILTER node
         cols = ['timestamp', 'value', 'name_r', 'sensor_type']
         df_final = df_final[cols]
 
