@@ -29,7 +29,7 @@ STATIC_FILE   = RAW_DATA_ROOT / "static" / "data_static.csv"
 
 # --- Sample mode ----------------------------------------------------------
 # Set SAMPLE_MODE = True to only ingest the first N files per user/source.
-SAMPLE_MODE        = True
+SAMPLE_MODE        = False
 SAMPLE_FILES_LIMIT = 5
 # --------------------------------------------------------------------------
 
@@ -378,7 +378,7 @@ def load_iot_files(conn):
         if not user_dir.is_dir() or user_dir.name.lower() in reserved:
             continue
 
-        json_files = sorted(user_dir.rglob("*.json"))
+        json_files = list(user_dir.rglob("*.json"))
         if SAMPLE_MODE:
             json_files = json_files[:SAMPLE_FILES_LIMIT]
             log.info(f"  User: {user_dir.name} – {len(json_files)} files (SAMPLE MODE, limit={SAMPLE_FILES_LIMIT})")
@@ -476,7 +476,7 @@ def load_meteo_files(conn):
         log.warning(f"meteo2 folder not found: {meteo2_dir}")
         return
 
-    csv_files = sorted(meteo2_dir.rglob("Pred_*.csv"))
+    csv_files = list(meteo2_dir.rglob("Pred_*.csv"))
     if SAMPLE_MODE:
         csv_files = csv_files[:SAMPLE_FILES_LIMIT]
         log.info(f"  {len(csv_files)} prediction files (SAMPLE MODE, limit={SAMPLE_FILES_LIMIT})")

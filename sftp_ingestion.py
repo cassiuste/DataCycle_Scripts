@@ -13,7 +13,7 @@ remote_dir = "/Meteo2"
 local_folder = "meteo2"
 
 
-log_dir = r"C:\Logs"
+log_dir = r"C:\Logs\bronze"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "sftp_ingestion.log")
 

@@ -1,0 +1,329 @@
+// ============================================================
+// STAR SCHEMA – IoT Smart Home Analytics
+// Paste this into https://dbdiagram.io
+// Source: gold + silver layer (PostgreSQL)
+// ============================================================
+
+
+// ============================================================
+// DIMENSION TABLES
+// ============================================================
+
+Table dim_building {
+  building_key      integer   [primary key, note: 'Surrogate key']
+  id_building       integer   [not null, note: 'Natural key from silver']
+  house_name        varchar
+  first_name        varchar
+  last_name         varchar
+  address           varchar
+  city              varchar
+  npa               integer
+  latitude          float
+  longitude         float
+  building_year     integer
+  nb_people         integer
+  id_building_type  integer
+
+  Note: 'Dimension – Buildings / households'
+}
+
+Table dim_date {
+  date_key      integer   [primary key, note: 'YYYYMMDD format']
+  full_date     date
+  day_of_week   varchar
+  day_num       integer
+  week_num      integer
+  month_num     integer
+  month_name    varchar
+  quarter       integer
+  year          integer
+  is_weekend    boolean
+
+  Note: 'Dimension – Calendar dates'
+}
+
+Table dim_hour {
+  hour_key      integer   [primary key, note: '0-23']
+  hour_label    varchar   [note: 'e.g. 08:00, 14:00']
+  time_of_day   varchar   [note: 'Morning / Afternoon / Evening / Night']
+
+  Note: 'Dimension – Hour of day'
+}
+
+Table dim_room {
+  room_key      integer   [primary key]
+  room_name     varchar   [not null, note: 'e.g. Office, Livingroom, Kitchen']
+  room_type     varchar   [note: 'e.g. Living, Work, Sanitary, Other']
+
+  Note: 'Dimension – Rooms / locations inside a building'
+}
+
+Table dim_station {
+  station_key   integer   [primary key]
+  station_name  varchar   [not null, note: 'e.g. Livingroom, Office, Bdroom, Outdoor']
+  is_outdoor    boolean
+
+  Note: 'Dimension – Meteo sensor stations'
+}
+
+Table dim_sensor_type {
+  sensor_type_key   integer   [primary key]
+  sensor_type       varchar   [not null, note: 'Door or Window']
+
+  Note: 'Dimension – Type of door/window sensor'
+}
+
+
+// ============================================================
+// FACT TABLES
+// ============================================================
+
+// ------ Energy -----------------------------------------------
+
+Table fact_consumption_hourly {
+  id                  integer   [primary key]
+  building_key        integer   [not null, ref: > dim_building.building_key]
+  date_key            integer   [not null, ref: > dim_date.date_key]
+  hour_key            integer   [not null, ref: > dim_hour.hour_key]
+
+  avg_total_power_w   float
+  min_total_power_w   float
+  max_total_power_w   float
+  avg_power1_w        float
+  avg_power2_w        float
+  avg_power3_w        float
+  avg_current1_a      float
+  avg_current2_a      float
+  avg_current3_a      float
+  avg_voltage1_v      float
+  avg_voltage2_v      float
+  avg_voltage3_v      float
+  avg_pf1             float
+  avg_pf2             float
+  avg_pf3             float
+  estimated_energy_wh float
+  sample_count        integer
+
+  Note: 'Fact – Hourly whole-house energy consumption (3-phase)'
+}
+
+Table fact_consumption_daily {
+  id                  integer   [primary key]
+  building_key        integer   [not null, ref: > dim_building.building_key]
+  date_key            integer   [not null, ref: > dim_date.date_key]
+
+  avg_total_power_w   float
+  min_total_power_w   float
+  max_total_power_w   float
+  peak_total_power_w  float
+  avg_power1_w        float
+  avg_power2_w        float
+  avg_power3_w        float
+  avg_voltage1_v      float
+  avg_voltage2_v      float
+  avg_voltage3_v      float
+  avg_pf1             float
+  avg_pf2             float
+  avg_pf3             float
+  estimated_energy_wh float
+  sample_count        integer
+
+  Note: 'Fact – Daily whole-house energy consumption (3-phase)'
+}
+
+Table fact_plugs_hourly {
+  id                integer   [primary key]
+  building_key      integer   [not null, ref: > dim_building.building_key]
+  room_key          integer   [not null, ref: > dim_room.room_key]
+  date_key          integer   [not null, ref: > dim_date.date_key]
+  hour_key          integer   [not null, ref: > dim_hour.hour_key]
+
+  avg_power_w       float
+  min_power_w       float
+  max_power_w       float
+  avg_temperature_c float
+  pct_switch_on     float
+  sample_count      integer
+
+  Note: 'Fact – Hourly smart plug readings per room'
+}
+
+Table fact_plugs_daily {
+  id                integer   [primary key]
+  building_key      integer   [not null, ref: > dim_building.building_key]
+  room_key          integer   [not null, ref: > dim_room.room_key]
+  date_key          integer   [not null, ref: > dim_date.date_key]
+
+  avg_power_w       float
+  min_power_w       float
+  max_power_w       float
+  avg_temperature_c float
+  pct_switch_on     float
+  sample_count      integer
+
+  Note: 'Fact – Daily smart plug readings per room'
+}
+
+// ------ Climate ----------------------------------------------
+
+Table fact_meteo_indoor_hourly {
+  id                    integer   [primary key]
+  building_key          integer   [not null, ref: > dim_building.building_key]
+  station_key           integer   [not null, ref: > dim_station.station_key]
+  date_key              integer   [not null, ref: > dim_date.date_key]
+  hour_key              integer   [not null, ref: > dim_hour.hour_key]
+
+  avg_temperature_c     float
+  min_temperature_c     float
+  max_temperature_c     float
+  avg_humidity_pct      float
+  avg_co2_ppm           float
+  avg_noise_db          float
+  avg_pressure_hpa      float
+  sample_count          integer
+
+  Note: 'Fact – Hourly indoor climate per meteo station'
+}
+
+Table fact_meteo_indoor_daily {
+  id                    integer   [primary key]
+  building_key          integer   [not null, ref: > dim_building.building_key]
+  station_key           integer   [not null, ref: > dim_station.station_key]
+  date_key              integer   [not null, ref: > dim_date.date_key]
+
+  avg_temperature_c     float
+  min_temperature_c     float
+  max_temperature_c     float
+  avg_humidity_pct      float
+  min_humidity_pct      float
+  max_humidity_pct      float
+  avg_co2_ppm           float
+  max_co2_ppm           float
+  avg_noise_db          float
+  avg_pressure_hpa      float
+  sample_count          integer
+
+  Note: 'Fact – Daily indoor climate per meteo station'
+}
+
+Table fact_humidity_hourly {
+  id                integer   [primary key]
+  building_key      integer   [not null, ref: > dim_building.building_key]
+  room_key          integer   [not null, ref: > dim_room.room_key]
+  date_key          integer   [not null, ref: > dim_date.date_key]
+  hour_key          integer   [not null, ref: > dim_hour.hour_key]
+
+  avg_temperature_c float
+  avg_humidity_pct  float
+  min_humidity_pct  float
+  max_humidity_pct  float
+  sample_count      integer
+
+  Note: 'Fact – Hourly humidity sensor readings (laundry, bathroom)'
+}
+
+Table fact_humidity_daily {
+  id                integer   [primary key]
+  building_key      integer   [not null, ref: > dim_building.building_key]
+  room_key          integer   [not null, ref: > dim_room.room_key]
+  date_key          integer   [not null, ref: > dim_date.date_key]
+
+  avg_temperature_c float
+  avg_humidity_pct  float
+  min_humidity_pct  float
+  max_humidity_pct  float
+  sample_count      integer
+
+  Note: 'Fact – Daily humidity sensor readings (laundry, bathroom)'
+}
+
+// ------ Occupancy --------------------------------------------
+
+Table fact_occupancy_hourly {
+  id                      integer   [primary key]
+  building_key            integer   [not null, ref: > dim_building.building_key]
+  date_key                integer   [not null, ref: > dim_date.date_key]
+  hour_key                integer   [not null, ref: > dim_hour.hour_key]
+
+  any_motion_detected     boolean
+  rooms_with_motion       integer
+  avg_light_lux           float
+  avg_doors_open_count    float
+  avg_windows_open_count  float
+  max_doors_open_count    integer
+  max_windows_open_count  integer
+  sample_count            integer
+
+  Note: 'Fact – Hourly occupancy indicators (motion + doors/windows)'
+}
+
+Table fact_occupancy_daily {
+  id                      integer   [primary key]
+  building_key            integer   [not null, ref: > dim_building.building_key]
+  date_key                integer   [not null, ref: > dim_date.date_key]
+
+  hours_with_motion       integer
+  total_motion_events     integer
+  pct_hours_occupied      float
+  avg_doors_open_count    float
+  avg_windows_open_count  float
+  max_doors_open_count    integer
+  max_windows_open_count  integer
+  sample_count            integer
+
+  Note: 'Fact – Daily occupancy indicators'
+}
+
+// ------ Anomalies --------------------------------------------
+
+Table fact_anomalies {
+  id                          integer   [primary key]
+  building_key                integer   [not null, ref: > dim_building.building_key]
+  date_key                    integer   [not null, ref: > dim_date.date_key]
+  hour_key                    integer   [not null, ref: > dim_hour.hour_key]
+
+  overpower_detected          boolean
+  overtemperature_detected    boolean
+  high_plug_power_room        varchar
+  total_power_spike           boolean
+  phase_imbalance             boolean
+  high_co2_detected           boolean
+  high_co2_station            varchar
+  max_co2_ppm                 integer
+  high_humidity_detected      boolean
+  high_humidity_room          varchar
+  low_battery_detected        boolean
+  low_battery_device          varchar
+
+  Note: 'Fact – Anomaly flags per event (one row per IoT snapshot)'
+}
+
+// ------ Solar ------------------------------------------------
+
+Table fact_solar_hourly {
+  id                  integer   [primary key]
+  date_key            integer   [not null, ref: > dim_date.date_key]
+  hour_key            integer   [not null, ref: > dim_hour.hour_key]
+  site                varchar   [not null, note: 'e.g. Sion']
+
+  avg_irradiance_wm2  float
+  max_irradiance_wm2  float
+  is_missing          boolean
+  sample_count        integer
+
+  Note: 'Fact – Hourly solar irradiance prediction (Sion)'
+}
+
+Table fact_solar_daily {
+  id                  integer   [primary key]
+  date_key            integer   [not null, ref: > dim_date.date_key]
+  site                varchar   [not null, note: 'e.g. Sion']
+
+  avg_irradiance_wm2  float
+  max_irradiance_wm2  float
+  peak_hour           integer
+  is_missing          boolean
+  sample_count        integer
+
+  Note: 'Fact – Daily solar irradiance prediction (Sion)'
+}

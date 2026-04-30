@@ -39,7 +39,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE = LOG_DIR / f"etl_gold_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
 
 # --- Sample mode --------------------------------------------------------------
-SAMPLE_MODE  = True
+SAMPLE_MODE  = False
 SAMPLE_LIMIT = 100   # max rows fetched per silver table during testing
 # Set SAMPLE_MODE = False when ready for full load
 # ------------------------------------------------------------------------------
