@@ -36,7 +36,7 @@ def predict_room_presence():
     y = df['target_presence']
 
     # Training the Model
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
     model.fit(X, y)
     print(f"Model trained on {len(df)} historical records.")
 
