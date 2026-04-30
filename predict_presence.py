@@ -15,12 +15,18 @@ def predict_room_presence():
             d.hour,
             d.day_of_week,
             CASE WHEN d.is_weekend THEN 1 ELSE 0 END AS is_weekend_int,
-            CASE WHEN f.motion_detected = true THEN 1 ELSE 0 END AS target_presence
+            MAX(CASE WHEN f.motion_detected = true THEN 1 ELSE 0 END) AS target_presence
         FROM gold.fact_room_presence f
         JOIN gold.dim_date d 
             ON f.date_key = d.date_key AND f.hour = d.hour AND f.minute = d.minute
         JOIN gold.dim_room r 
             ON f.room_key = r.room_key
+        GROUP BY 
+            r.room_name,
+            d.date_key,
+            d.hour,
+            d.day_of_week,
+            d.is_weekend
     """
     df = pd.read_sql(query, engine)
     
@@ -63,13 +69,12 @@ def predict_room_presence():
     future_features = future_df[['room_code', 'hour', 'day_of_week', 'is_weekend_int']]
     future_df['is_present_predicted'] = model.predict(future_features)
     
-    #Save Predictions to the schema
     # We only keep the columns that match our SQL table structure
     db_export = future_df[['date_key', 'hour', 'room_name', 'is_present_predicted']]
     
     try:
         db_export.to_sql('presence_forecast', engine, schema='predictions', if_exists='append', index=False)
-        print(f"Successfully saved {len(db_export)} presence predictions to predictions.presence_forecast!")
+        print(f"Successfully saved {len(db_export)} presence predictions to predictions.presence_forecast")
     except Exception as e:
         print(f"Failed to save to database. Error: {e}")
 
