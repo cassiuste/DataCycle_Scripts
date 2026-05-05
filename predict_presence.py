@@ -11,99 +11,115 @@ DB_URI = 'postgresql+psycopg2://postgres:admin@127.0.0.1:5432/apartments'
 def predict_room_presence():
     print("--- Starting Room Presence Prediction Workflow ---")
     engine = create_engine(DB_URI)
-    
+
     query = """
-        SELECT 
+        SELECT
+            f.date_key,
+            f.building_key,
+            f.room_key,
             r.room_name,
             d.hour,
             d.day_of_week,
             CASE WHEN d.is_weekend THEN 1 ELSE 0 END AS is_weekend_int,
-            MAX(CASE WHEN f.motion_detected = true THEN 1 ELSE 0 END) AS target_presence
+            MAX(CASE WHEN f.motion_detected = true THEN 1 ELSE 0 END) AS actual_presence
         FROM gold.fact_room_presence f
-        JOIN gold.dim_date d 
-            ON f.date_key = d.date_key AND f.hour = d.hour AND f.minute = d.minute
-        JOIN gold.dim_room r 
+        JOIN gold.dim_date d
+            ON f.date_key = d.date_key
+            AND f.hour    = d.hour
+            AND f.minute  = d.minute
+        JOIN gold.dim_room r
             ON f.room_key = r.room_key
-        GROUP BY 
-            r.room_name,
-            d.date_key,
-            d.hour,
-            d.day_of_week,
-            d.is_weekend
+        GROUP BY
+            f.date_key, f.building_key, f.room_key, r.room_name,
+            d.hour, d.day_of_week, d.is_weekend
+        ORDER BY f.date_key, d.hour
     """
     df = pd.read_sql(query, engine)
-    
+
     if df.empty:
-        print("No historical data found. Exiting.")
+        print("No data found. Exiting.")
         return
-    
+
+    print(f"Loaded {len(df)} rows of historical data.")
+
     df['room_code'] = df['room_name'].astype('category').cat.codes
-    room_mapping = dict(enumerate(df['room_name'].astype('category').cat.categories))
 
-    X = df[['room_code', 'hour', 'day_of_week', 'is_weekend_int']]
-    y = df['target_presence']
+    df = df.sort_values(['date_key', 'hour']).reset_index(drop=True)
+    split_idx = int(len(df) * 0.8)
+    df_train = df.iloc[:split_idx]
+    df_test  = df.iloc[split_idx:]
 
-    X_train_split, X_test_split, y_train_split, y_test_split = train_test_split(X, y, test_size=0.2, random_state=42)
+    features = ['room_code', 'hour', 'day_of_week', 'is_weekend_int']
+    X_train, y_train = df_train[features], df_train['actual_presence']
+    X_test,  y_test  = df_test[features],  df_test['actual_presence']
 
     models = {
         "Logistic Regression": LogisticRegression(class_weight='balanced', max_iter=1000),
-        "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'),
-        "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42)
+        "Random Forest":       RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced'),
+        "Gradient Boosting":   GradientBoostingClassifier(n_estimators=100, random_state=42),
     }
 
     print("\n--- Model Comparison Performance ---")
-    best_model_name = ""
-    best_model = None
-    highest_score = -1 
+    performance_rows = []
+    best_model_name, best_model, best_f1 = "", None, -1.0
 
     for name, model in models.items():
-        model.fit(X_train_split, y_train_split)
-        predictions = model.predict(X_test_split)
-        
-        accuracy = accuracy_score(y_test_split, predictions)
-        f1 = f1_score(y_test_split, predictions, zero_division=0)
-        
-        print(f"{name} -> Accuracy: {accuracy:.2f} | F1-Score: {f1:.2f}")
-        
-        if f1 > highest_score:
-            highest_score = f1
+        model.fit(X_train, y_train)
+        preds    = model.predict(X_test)
+        accuracy = accuracy_score(y_test, preds)
+        f1       = f1_score(y_test, preds, zero_division=0)
+        print(f"{name} -> Accuracy: {accuracy:.2f} | F1: {f1:.2f}")
+
+        performance_rows.append({
+            "run_date":          datetime.date.today(),
+            "pipeline":          "presence",
+            "model_name":        name,
+            "mae_w":             None,
+            "rmse_w":            None,
+            "accuracy":          round(accuracy, 4),
+            "f1_score":          round(f1, 4),
+            "is_winner":         False,
+            "trained_on_n_rows": len(df_train),
+        })
+
+        if f1 > best_f1:
+            best_f1         = f1
             best_model_name = name
-            best_model = model
+            best_model      = model
 
-    print(f"\nWinner: {best_model_name} with an F1-Score of {highest_score:.2f}")
+    for row in performance_rows:
+        if row["model_name"] == best_model_name:
+            row["is_winner"] = True
 
-    print(f"\n--- Training {best_model_name} on 100% of historical data ---")
-    best_model.fit(X, y)
+    print(f"\nWinner: {best_model_name} — F1: {best_f1:.2f}")
 
-    future_data = []
-    tomorrow = datetime.datetime.now() + datetime.timedelta(days=1)
-    tomorrow_date_key = int(tomorrow.strftime('%Y%m%d'))
-    tomorrow_dow = tomorrow.isoweekday()
-    tomorrow_is_weekend = 1 if tomorrow_dow >= 6 else 0
+    print(f"\n--- Re-training {best_model_name} on 100% of data ---")
+    best_model.fit(df[features], df['actual_presence'])
 
-    for room_code, room_name in room_mapping.items():
-        for hr in range(24):
-            future_data.append({
-                'date_key': tomorrow_date_key,
-                'hour': hr,
-                'room_name': room_name,
-                'room_code': room_code,
-                'day_of_week': tomorrow_dow,
-                'is_weekend_int': tomorrow_is_weekend
-            })
-            
-    future_df = pd.DataFrame(future_data)
-    
-    future_features = future_df[['room_code', 'hour', 'day_of_week', 'is_weekend_int']]
-    future_df['is_present_predicted'] = best_model.predict(future_features)
-    
-    db_export = future_df[['date_key', 'hour', 'room_name', 'is_present_predicted']]
-    
+    df['is_present_predicted'] = best_model.predict(df[features])
+    df['is_correct']           = df['is_present_predicted'] == df['actual_presence']
+    df['model_name']           = best_model_name
+
+    export_presence = df[[
+        'date_key', 'hour', 'building_key', 'room_key', 'room_name',
+        'is_present_predicted', 'actual_presence', 'is_correct', 'model_name'
+    ]].rename(columns={'actual_presence': 'is_present_actual'})
+
+
     try:
-        db_export.to_sql('presence_forecast', engine, schema='predictions', if_exists='append', index=False)
-        print(f"Successfully deployed! Saved {len(db_export)} presence predictions to database.")
+        pd.DataFrame(performance_rows).to_sql(
+            'model_performance', engine,
+            schema='predictions', if_exists='append', index=False
+        )
+        print(f"Saved {len(performance_rows)} model metrics.")
+
+        export_presence.to_sql(
+            'presence_forecast', engine,
+            schema='predictions', if_exists='replace', index=False
+        )
+        print(f"Saved {len(export_presence)} presence forecast rows.")
     except Exception as e:
-        print(f"Failed to save to database. Error: {e}")
+        print(f"DB error: {e}")
 
 if __name__ == "__main__":
     predict_room_presence()
