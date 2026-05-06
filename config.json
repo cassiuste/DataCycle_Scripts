@@ -1,0 +1,20 @@
+{
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "dbname": "apartments",
+        "user": "postgres",
+        "pass": "admin"
+    },
+    "paths": {
+        "raw_root": "C:\\RawData",
+        "logs": "C:\\Logs",
+        "backups": "C:\\Backups\\postgres",
+        "sac_export": "C:\\SAC_Export"
+    },
+    "sftp": {
+        "host": "10.130.25.152",
+        "user": "Student",
+        "pass": "3uw.AQ!SWxsDBm2zi3"
+    }
+}
